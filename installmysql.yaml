@@ -112,7 +112,7 @@
       register: temp_password
     - name: install python mysql connector
       pip:
-        name: "{{ playbook_dir }}/pymysql-1.1.2-py3-none-any.whl"
+        name: "{{ playbook_dir }}/pymysql-1.0.2-py3-none-any.whl"
     - name: Set root user password
       shell:
         cmd: mysql -u root --password='{{ temp_password.stdout }}' --connect-expired-password -e "alter user 'root'@'localhost' identified by '{{ root_password }}';"
