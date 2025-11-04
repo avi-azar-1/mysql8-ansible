@@ -1,0 +1,6 @@
+[all:vars]
+playbook_dir=/...somepath.../
+rpm_dir=/...somepath.../mysqlrpm
+root_password=...
+[mysql_servers]
+example port=3333 max_connections=500 character_set=utf8 buffer_pool_size=500M app_user= app_password= db=

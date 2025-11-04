@@ -1,0 +1,167 @@
+- name: Initialize MySQL database
+  hosts: all
+  become: true
+  tasks:
+    - name: check if mysql is running 
+      service_facts: 
+      register: services_state
+    - name: make sure mysql is not installed 
+      assert:
+        that: services_state["ansible_facts"]["services"]["mysqld.service"] is not defined
+    - name: enable selinux
+      selinux:
+        state: permissive
+        policy: targeted
+    - name: Create Physical and Volume Group
+      lvg:
+        vg: "{{ item.vg }}"
+        pvs: "{{ item.pv }}"
+      loop:
+        - { pv: "/dev/sdb", vg: "sqldatavg" }
+        - { pv: "/dev/sdc", vg: "sqlbackupvg" }
+    - name: Create Logical Volume
+      lvol:
+        vg: "{{ item.vg }}"
+        lv: "{{ item.lv }}"
+        size: +100%FREE
+      loop:
+        - { vg: "sqldatavg", lv: "sqldatalv" }
+        - { vg: "sqlbackupvg", lv: "sqlbackupvg" }
+    - name: Format the XFS File System
+      filesystem:
+        fstype: xfs
+        dev: "{{ item }}"
+      loop:
+        - /dev/mapper/sqldatavg-sqldatalv
+        - /dev/mapper/sqlbackupvg-sqlbackupvg
+    - name: Create Mount Directories
+      file:
+        path: "{{ item.path  }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.privs }}"
+      loop:
+        - { path: "/db/{{ ansible_hostname }}", privs: 755 }
+        - { path: "/db/{{ ansible_hostname }}/backup", privs: 700 }
+    - name: Mount Filesystems
+      mount:
+        path: "{{ item.path }}"
+        src: "{{ item.src }}"
+        fstype: xfs
+        opts: defaults
+        state: mounted
+      loop:
+        - { path: "/db/{{ ansible_hostname }}", src: "/dev/mapper/sqldatavg-sqldatalv" }
+        - { path: "/db/{{ ansible_hostname }}/backup", src: "/dev/mapper/sqlbackupvg-sqlbackupvg" }
+    - name: create mysql group
+      group:
+        name: mysql
+        gid: 27
+        local: yes
+    - name: create mysql user
+      user:
+        name: mysql
+        uid: 27
+        local: yes
+        group: mysql
+        shell: /bin/bash
+        home: /var/lib/mysql 
+        create_home: no
+        system: yes
+        comment: "MySQL Server"
+    - name: disable mysql module
+      shell:
+        cmd: yum module disable mysql -y
+        warn: false
+    - name: copy rpms
+      copy:
+          src: "{{ rpm_dir }}"
+          dest: /mysqlrpm
+    - name: install mysql rpms 
+      shell: yum --disablerepo=* localinstall -y --allowerasing /mysqlrpm/mysqlrpm/*.rpm 
+    - name: set log permissions 
+      shell: chmod 777 /var/log
+    - name: create mysql directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: 0755
+        owner: mysql
+        group: mysql
+      loop:
+        - { path: "/db/{{ ansible_hostname }}/data101" }
+        - { path: "/db/{{ ansible_hostname }}/temp" }
+        - { path: "/db/{{ ansible_hostname }}/backup" }
+        - { path: "/db/{{ ansible_hostname }}/log" }
+        - { path: "/db/{{ ansible_hostname }}/log/redo" }
+    - name: create my.cnf file
+      template:
+        src: "{{ playbook_dir }}/my.cnf.template.j2"
+        dest: "/etc/my.cnf"
+        force: yes
+    - name: start mysql service
+      service:
+        name: mysqld
+        state: started
+        enabled: yes
+    - name: find initial root password
+      shell: 
+        chdir: /var/log
+        cmd: "grep 'temporary password' mysqld.log | awk '{print $13}' | tail -1"
+      register: temp_password
+    - name: install python mysql connector
+      pip:
+        name: "{{ playbook_dir }}/pymysql-1.1.2-py3-none-any.whl"
+    - name: Set root user password
+      shell:
+        cmd: mysql -u root --password='{{ temp_password.stdout }}' --connect-expired-password -e "alter user 'root'@'localhost' identified by '{{ root_password }}';"
+    - name: create mysql user
+      mysql_user:
+        name: admin
+        password: "{{ root_password }}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        host: "%"
+        priv: '*.*:ALL'
+        login_user: root
+        login_password: "{{ root_password }}"
+        state: present
+    - name: create bkpuser 
+      mysql_user:
+        name: bkpuser
+        password: "{{ root_password }}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        host: "%"
+        priv: '*.*:reload,lock tables,process,replication client,SELECT,INSERT,UPDATE,CREATE,DROP,RELOAD,SHUTDOWN,FILE,INDEX,ALTER,LOCK TABLES,CREATE VIEW,SHOW VIEW,TRIGGER,CREATE ROUTINE,DELETE,EVENT,ALTER ROUTINE,backup_admin'
+        login_user: root
+        login_password: "{{ root_password }}"
+        state: present  
+    - name: create shob_user
+      mysql_user:
+        name: shob_user
+        password: shobmonitor
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        host: "%"
+        priv: '*.*:select,replication client'
+        login_user: root
+        login_password: "{{ root_password }}"
+        state: present    
+    - name: create application database
+      mysql_db:
+        name: "{{db}}"
+        state: present
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        login_user: root
+        login_password: "{{ root_password }}"
+      when: db != ''
+    - name: create applicative user
+      mysql_user:
+        name: "{{app_user}}"
+        password: "{{app_password}}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        host: "%"
+        priv: '{{db}}.*:alter,delete,insert,select,update,create view,execute,index'
+        login_user: root
+        login_password: "{{ root_password }}"
+        state: present    
+      when: db != '' and app_user != '' and app_password != '' 
