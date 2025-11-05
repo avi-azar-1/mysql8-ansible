@@ -12,11 +12,11 @@ https://github.com/avi-azar-1/rhel8.8-ansible
 2. **install ansible**:  
 look at instructions in ansible repo
 
-3. **ready redis install**:  
+3. **ready mysql install**:  
 unzip this repo in target server  
 
 4. **edit playbook**:  
-change target server and parameters inside redis_inventory.yaml
+change target server and parameters inside mysql_inventory.yaml
 
 5. **run playbook**:  
 from playbook folder:
