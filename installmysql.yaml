@@ -80,6 +80,12 @@
           dest: /mysqlrpm
     - name: install mysql rpms 
       shell: yum --disablerepo=* localinstall -y --allowerasing /mysqlrpm/mysqlrpm/*.rpm 
+      when: 
+        - ansible_facts['distribution_major_version'] == '8'
+    - name: install mysql rpms rhel9
+      shell: yum --disablerepo=* localinstall -y --allowerasing /mysqlrpm/mysqlrpmrhel9/*.rpm 
+      when: 
+        - ansible_facts['distribution_major_version'] == '9'
     - name: set log permissions 
       shell: chmod 777 /var/log
     - name: create mysql directories
