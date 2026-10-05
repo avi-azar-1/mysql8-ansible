@@ -8,6 +8,8 @@ generic install for mysql8 instance on rhel 8 servers, including software unpack
 - download this repo  
 - also download ansible rhel 8 install from:  
 https://github.com/avi-azar-1/rhel8.8-ansible
+- or rhel 9 install from:  
+https://github.com/avi-azar-1/rhel9.6-ansible
 
 2. **install ansible**:  
 look at instructions in ansible repo
