@@ -70,11 +70,11 @@
         create_home: no
         system: yes
         comment: "MySQL Server"
-    - name: disable mysql module
-      shell:
-        cmd: yum module disable mysql -y
-        warn: false
-    - name: copy rpms
+    - name: Disable mysql module
+      ansible.builtin.dnf:
+        name: '@mysql'
+        state: disabled
+    - name: copy rpms4
       copy:
           src: "{{ rpm_dir }}"
           dest: /mysqlrpm
