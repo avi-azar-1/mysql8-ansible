@@ -15,12 +15,18 @@ https://github.com/avi-azar-1/rhel9.6-ansible
 look at instructions in ansible repo
 
 3. **ready mysql install**:  
+run script 
+```bash
+./add_module.sh
+```
+
+4. **ready mysql modules**:  
 unzip this repo in target server  
 
-4. **edit playbook**:  
+5. **edit playbook**:  
 change target server and parameters inside mysql_inventory.yaml
 
-5. **run playbook**:  
+6. **run playbook**:  
 from playbook folder:
 ```bash
 ansible-playbook -i mysql_inventory.yaml installmysql.yaml
